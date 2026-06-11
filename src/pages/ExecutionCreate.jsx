@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowRight, FileText, RefreshCw } from 'lucide-react';
+import { AlertCircle, ArrowRight, ChevronDown, FileText, RefreshCw, X } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -17,32 +17,45 @@ const ExecutionCreate = () => {
   const executionIdFromUrl = searchParams.get('executionId');
 
   const [states, setStates] = useState([]);
-  const [districts, setDistricts] = useState([]);
   const [statesLoading, setStatesLoading] = useState(false);
-  const [districtsLoading, setDistrictsLoading] = useState(false);
   const [stateError, setStateError] = useState('');
-  const [districtError, setDistrictError] = useState('');
+  const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
+  const stateDropdownRef = useRef(null);
   const [creatingAnalysis, setCreatingAnalysis] = useState(false);
   const [loadingExecution, setLoadingExecution] = useState(false);
   const [globalError, setGlobalError] = useState('');
   const [globalSuccess, setGlobalSuccess] = useState('');
   const [executionId, setExecutionId] = useState(executionIdFromUrl || '');
   const [isEditMode, setIsEditMode] = useState(false);
-  const [prefillLoaded, setPrefillLoaded] = useState(false);
 
   const [formValues, setFormValues] = useState({
     name: '',
-    stateId: '',
-    stateName: '',
-    districtId: '',
-    districtName: '',
+    selectedStateNames: [],
   });
 
-  const stateOptionMap = useMemo(() => new Map(states.map((stateItem) => [stateItem.id, stateItem])), [states]);
-  const districtOptionMap = useMemo(
-    () => new Map(districts.map((districtItem) => [districtItem.id, districtItem])),
-    [districts]
-  );
+  useEffect(() => {
+    void loadStates();
+  }, []);
+
+  useEffect(() => {
+    if (executionIdFromUrl) {
+      void loadExecution(executionIdFromUrl);
+      return;
+    }
+    setIsEditMode(false);
+    setExecutionId('');
+    setFormValues({ name: '', selectedStateNames: [] });
+  }, [executionIdFromUrl]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(event.target)) {
+        setStateDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadStates = async () => {
     setStatesLoading(true);
@@ -58,54 +71,13 @@ const ExecutionCreate = () => {
     }
   };
 
-  const loadDistricts = async (stateId) => {
-    if (!stateId) {
-      setDistricts([]);
-      return;
-    }
-    setDistrictsLoading(true);
-    setDistrictError('');
-    try {
-      const districtItems = await entityService.getDistricts(stateId);
-      setDistricts(districtItems);
-    } catch (error) {
-      setDistricts([]);
-      setDistrictError(error?.message || 'Unable to load districts for selected state.');
-    } finally {
-      setDistrictsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadStates();
-  }, []);
-
-  useEffect(() => {
-    if (executionIdFromUrl) {
-      void loadExecution(executionIdFromUrl);
-      return;
-    }
-    setIsEditMode(false);
-    setExecutionId('');
-    setPrefillLoaded(false);
-    setFormValues({
-      name: '',
-      stateId: '',
-      stateName: '',
-      districtId: '',
-      districtName: '',
-    });
-  }, [executionIdFromUrl]);
-
   const loadExecution = async (id) => {
     setLoadingExecution(true);
     setGlobalError('');
-    setPrefillLoaded(false);
     setIsEditMode(false);
-    setDistricts([]);
     try {
       const execution = await executionService.getExecution(id);
-      
+
       if (!['draft', 'validated'].includes((execution.status || '').toLowerCase())) {
         setGlobalError('Only draft or validated executions can be edited.');
         return;
@@ -115,12 +87,8 @@ const ExecutionCreate = () => {
       setExecutionId(id);
       setFormValues({
         name: execution.name || '',
-        stateId: '',
-        stateName: execution.state || '',
-        districtId: '',
-        districtName: execution.district || '',
+        selectedStateNames: Array.isArray(execution.states) ? execution.states : [],
       });
-      setPrefillLoaded(true);
     } catch (error) {
       const message = error?.response?.data?.detail || error?.message || 'Failed to load execution.';
       setGlobalError(typeof message === 'string' ? message : 'Failed to load execution.');
@@ -129,37 +97,6 @@ const ExecutionCreate = () => {
     }
   };
 
-  useEffect(() => {
-    if (!isEditMode || !prefillLoaded || !formValues.stateName || formValues.stateId || states.length === 0) {
-      return;
-    }
-
-    const matchingState = states.find((stateItem) => stateItem.name === formValues.stateName);
-    if (!matchingState) {
-      return;
-    }
-
-    setFormValues((current) => ({
-      ...current,
-      stateId: matchingState.id,
-      stateName: matchingState.name,
-    }));
-    void loadDistricts(matchingState.id);
-  }, [formValues.stateId, formValues.stateName, isEditMode, prefillLoaded, states]);
-
-  // Effect to set district ID after districts are loaded
-  useEffect(() => {
-    if (isEditMode && formValues.districtName && districts.length > 0 && !formValues.districtId) {
-      const matchingDistrict = districts.find(d => d.name === formValues.districtName);
-      if (matchingDistrict) {
-        setFormValues(prev => ({
-          ...prev,
-          districtId: matchingDistrict.id,
-        }));
-      }
-    }
-  }, [districts, formValues.districtName, isEditMode, formValues.districtId]);
-
   const handleTextChange = (event) => {
     const { name, value } = event.target;
     setGlobalError('');
@@ -167,38 +104,15 @@ const ExecutionCreate = () => {
     setFormValues((current) => ({ ...current, [name]: value }));
   };
 
-  const handleStateChange = (event) => {
-    const selectedStateId = event.target.value;
-    const selectedState = stateOptionMap.get(selectedStateId);
-
+  const handleStateToggle = (stateName) => {
     setGlobalError('');
     setGlobalSuccess('');
-    setDistrictError('');
-    setDistricts([]);
-    setFormValues((current) => ({
-      ...current,
-      stateId: selectedStateId,
-      stateName: selectedState?.name || '',
-      districtId: '',
-      districtName: '',
-    }));
-
-    if (selectedStateId) {
-      void loadDistricts(selectedStateId);
-    }
-  };
-
-  const handleDistrictChange = (event) => {
-    const selectedDistrictId = event.target.value;
-    const selectedDistrict = districtOptionMap.get(selectedDistrictId);
-
-    setGlobalError('');
-    setGlobalSuccess('');
-    setFormValues((current) => ({
-      ...current,
-      districtId: selectedDistrictId,
-      districtName: selectedDistrict?.name || '',
-    }));
+    setFormValues((current) => {
+      const next = current.selectedStateNames.includes(stateName)
+        ? current.selectedStateNames.filter((s) => s !== stateName)
+        : [...current.selectedStateNames, stateName];
+      return { ...current, selectedStateNames: next };
+    });
   };
 
   const validateCreateForm = () => {
@@ -206,12 +120,8 @@ const ExecutionCreate = () => {
       setGlobalError('Analysis name is required.');
       return false;
     }
-    if (!formValues.stateId) {
-      setGlobalError('Please select a state.');
-      return false;
-    }
-    if (districts.length > 0 && !formValues.districtId) {
-      setGlobalError('Please select a district.');
+    if (formValues.selectedStateNames.length === 0) {
+      setGlobalError('Please select at least one state.');
       return false;
     }
     return true;
@@ -228,8 +138,7 @@ const ExecutionCreate = () => {
         // Update existing draft
         const response = await executionService.updateExecution(executionId, {
           name: formValues.name.trim(),
-          state: formValues.stateName,
-          district: formValues.districtName || null,
+          states: formValues.selectedStateNames,
         });
         setGlobalSuccess('Analysis updated successfully.');
         return response?.id || executionId;
@@ -238,8 +147,7 @@ const ExecutionCreate = () => {
         const response = await executionService.createExecutionDraft({
           name: formValues.name.trim(),
           csv_type_id: DEFAULT_CSV_TYPE_ID,
-          state: formValues.stateName,
-          district: formValues.districtName || undefined,
+          states: formValues.selectedStateNames,
         });
         const id = response?.id || '';
         setExecutionId(id);
@@ -323,54 +231,71 @@ const ExecutionCreate = () => {
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-800">State</Label>
-                    <select
-                      value={formValues.stateId}
-                      onChange={handleStateChange}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-slate-800">State</Label>
+                  <div className="relative" ref={stateDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setStateDropdownOpen((prev) => !prev)}
                       disabled={statesLoading}
-                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 hover:border-blue-400 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
+                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 hover:border-blue-400 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 flex items-center justify-between"
                     >
-                      <option value="">{statesLoading ? 'Loading states...' : 'Select state'}</option>
-                      {states.map((stateItem) => (
-                        <option key={stateItem.id} value={stateItem.id}>
-                          {stateItem.name}
-                        </option>
-                      ))}
-                    </select>
-                    {stateError && (
-                      <p className="flex items-center gap-1 text-xs text-rose-700">
-                        <AlertCircle className="h-3 w-3" />
-                        {stateError}
-                      </p>
+                      <span className="truncate text-left">
+                        {statesLoading
+                          ? 'Loading states...'
+                          : formValues.selectedStateNames.length === 0
+                            ? 'Select states'
+                            : `${formValues.selectedStateNames.length} state${formValues.selectedStateNames.length > 1 ? 's' : ''} selected`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-slate-500 shrink-0 ml-2" />
+                    </button>
+                    {stateDropdownOpen && states.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+                        <div className="max-h-48 overflow-y-auto py-1">
+                          {states.map((stateItem) => (
+                            <label
+                              key={stateItem.id}
+                              className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={formValues.selectedStateNames.includes(stateItem.name)}
+                                onChange={() => handleStateToggle(stateItem.name)}
+                                className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                              />
+                              <span className="text-sm text-slate-700">{stateItem.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-slate-800">District</Label>
-                    <select
-                      value={formValues.districtId}
-                      onChange={handleDistrictChange}
-                      disabled={!formValues.stateId || districtsLoading}
-                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-800 hover:border-blue-400 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
-                    >
-                      <option value="">
-                        {!formValues.stateId ? 'Select state first' : districtsLoading ? 'Loading districts...' : 'Select district'}
-                      </option>
-                      {districts.map((districtItem) => (
-                        <option key={districtItem.id} value={districtItem.id}>
-                          {districtItem.name}
-                        </option>
+                  {formValues.selectedStateNames.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {formValues.selectedStateNames.map((stateName) => (
+                        <span
+                          key={stateName}
+                          className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
+                        >
+                          {stateName}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${stateName}`}
+                            onClick={() => handleStateToggle(stateName)}
+                            className="hover:text-blue-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
                       ))}
-                    </select>
-                    {districtError && (
-                      <p className="flex items-center gap-1 text-xs text-rose-700">
-                        <AlertCircle className="h-3 w-3" />
-                        {districtError}
-                      </p>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  {stateError && (
+                    <p className="flex items-center gap-1 text-xs text-rose-700">
+                      <AlertCircle className="h-3 w-3" />
+                      {stateError}
+                    </p>
+                  )}
                 </div>
               </div>
 

@@ -487,7 +487,7 @@ GeoMap.propTypes = {
   tooltipHandlers: SchematicMap.propTypes.tooltipHandlers,
 };
 
-const DistrictRelevanceMap = ({ selectedState, stateSummaries, stateDistrictStats }) => {
+const DistrictRelevanceMap = ({ selectedState = '', stateSummaries, stateDistrictStats }) => {
   const stateNames = useMemo(() => Object.keys(stateSummaries || {}).sort(), [stateSummaries]);
   const activeState = selectedState || (stateNames.length === 1 ? stateNames[0] : '');
   const { geoJson, status, stateSlug } = useStateGeoJson(activeState);
@@ -545,10 +545,6 @@ DistrictRelevanceMap.propTypes = {
     Irrelevant: PropTypes.number,
   })).isRequired,
   stateDistrictStats: PropTypes.objectOf(SchematicMap.propTypes.statsByName).isRequired,
-};
-
-DistrictRelevanceMap.defaultProps = {
-  selectedState: '',
 };
 
 export default DistrictRelevanceMap;

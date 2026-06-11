@@ -41,4 +41,7 @@ export const ENV = {
     getEnvOrDefault('APPLICATION_VALIDATE_CRITERIA_MAX_ITEMS', '25'),
     'APPLICATION_VALIDATE_CRITERIA_MAX_ITEMS'
   ),
+  // When set, the Top Relevance Hierarchy section is only visible when the top-level
+  // State filter matches this value. Leave empty to always show the section.
+  HIERARCHY_STATE_LOCK: getEnvOrDefault('APPLICATION_HIERARCHY_STATE_LOCK', ''),
 };

@@ -177,8 +177,7 @@ const ExecutionDetail = () => {
 
   const quickDetails = useMemo(
     () => [
-      { label: 'State', value: execution?.state },
-      { label: 'District', value: execution?.district },
+      { label: 'State', value: execution?.states?.join(', ') || null },
       { label: 'Program', value: execution?.program_name },
       { label: 'Created On', value: formatDateTime(execution?.created_at) },
       { label: 'Last Updated', value: formatDateTime(execution?.updated_at) },

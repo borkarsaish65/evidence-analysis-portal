@@ -1,62 +1,65 @@
-# Evidence Analysis Portal - Phase 1
+# Evidence Analysis Portal
 
-React frontend SPA for the Evidence Analysis System.
+React frontend for the Evidence Analysis System.
+
+---
+
+## Prerequisites
+
+- Node.js 20+ and npm 10+
+- Backend API running at `http://localhost:6002`
+
+---
 
 ## Setup
 
-### Prerequisites
-- Node.js 16+ and npm 8+
-- Backend API running on `http://localhost:8000` (for development)
+```bash
+# Install dependencies
+npm install
 
-### Installation
+# Configure environment
+cp .env.example .env
 
-1. **Navigate to frontend directory**:
-   ```bash
-   cd evidence-analysis-portal-p1
-   ```
+# Start development server
+npm run dev
+```
 
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+Portal is available at http://localhost:5173.
 
-3. **Configure environment variables**:
-   ```bash
-   cp .env.example .env
-   ```
+---
 
-   All portal configuration is env-driven. Update `.env` values as needed.
+## Environment Variables
 
-4. **Run development server**:
-   ```bash
-   npm run dev
-   ```
-   
-   The frontend will be available at `http://localhost:5173`
-   
-   API requests are proxied based on `APPLICATION_BASE_URL` and `API_ENDPOINT`.
+All configuration is driven by `.env`. See `.env.example` for the full list.
 
-5. **Build for production**:
-   ```bash
-   npm run build
-   ```
-   
-   Production bundle is generated in the `dist/` directory.
+Minimum required:
+```env
+APPLICATION_PORT=5173
+API_ENDPOINT=http://localhost:6002
+```
 
-6. **Run linter**:
-   ```bash
-   npm run lint
-   ```
-   
-   Checks code quality with ESLint.
+---
 
-## Report Map Assets
+## Scripts
 
-District map files live in `public/maps/states`. To regenerate them from the DataMeet district shapefile:
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build production bundle to `dist/` |
+| `npm run lint` | Run ESLint |
+
+---
+
+## Map Assets
+
+District map files live in `public/maps/states`. To regenerate from the DataMeet district shapefile:
 
 ```bash
 mkdir -p /tmp/datameet-districts
-curl -L https://raw.githubusercontent.com/datameet/maps/master/Districts/Census_2011/2011_Dist.shp -o /tmp/datameet-districts/2011_Dist.shp
-curl -L https://raw.githubusercontent.com/datameet/maps/master/Districts/Census_2011/2011_Dist.dbf -o /tmp/datameet-districts/2011_Dist.dbf
-npm run prepare:maps -- --shp /tmp/datameet-districts/2011_Dist.shp --dbf /tmp/datameet-districts/2011_Dist.dbf
+curl -L https://raw.githubusercontent.com/datameet/maps/master/Districts/Census_2011/2011_Dist.shp \
+  -o /tmp/datameet-districts/2011_Dist.shp
+curl -L https://raw.githubusercontent.com/datameet/maps/master/Districts/Census_2011/2011_Dist.dbf \
+  -o /tmp/datameet-districts/2011_Dist.dbf
+npm run prepare:maps -- --shp /tmp/datameet-districts/2011_Dist.shp \
+  --dbf /tmp/datameet-districts/2011_Dist.dbf
 ```

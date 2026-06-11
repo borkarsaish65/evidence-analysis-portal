@@ -251,8 +251,7 @@ export const executionService = {
   createExecutionDraft: async ({
     name,
     csv_type_id,
-    state,
-    district,
+    states,
     program_name,
     ai_model_id,
     program_ref_id,
@@ -262,8 +261,7 @@ export const executionService = {
     const payload = {
       name,
       csv_type_id,
-      state,
-      district,
+      states,
       program_name,
       ai_model_id,
       program_ref_id,
@@ -360,8 +358,7 @@ export const executionService = {
   createExecution: async ({
     name,
     csv_type_id,
-    state,
-    district,
+    states,
     program_name,
     ai_model_id,
     program_ref_id,
@@ -372,8 +369,7 @@ export const executionService = {
     const initPayload = {
       name,
       csv_type_id,
-      state,
-      district,
+      states,
       program_name,
       ai_model_id,
       program_ref_id,
@@ -487,7 +483,19 @@ export const reportService = {
     return response.data;
   },
 
-  // Get validated CSV content for report rendering
+  // Get paginated report data with pre-aggregated summary (replaces full-CSV download)
+  getReportDataPage: async (executionId, { page = 1, pageSize = 1000, state, district, block, school, relevance } = {}) => {
+    const params = { page, page_size: pageSize };
+    if (state) params.state = state;
+    if (district) params.district = district;
+    if (block) params.block = block;
+    if (school) params.school = school;
+    if (relevance) params.relevance = relevance;
+    const response = await apiClient.get(`/reports/${executionId}/data`, { params });
+    return response.data;
+  },
+
+  // Get validated CSV content for report rendering (legacy path — kept for ReportsList local upload)
   getReportCsv: async (executionId) => {
     const response = await apiClient.get(`/reports/${executionId}/csv`, {
       responseType: 'text',

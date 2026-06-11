@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Eye, FileText, Filter, Loader2, Pencil, PlayCircle, RefreshCw, RotateCcw, Search } from 'lucide-react';
+import { ChevronDown, Download, Eye, FileText, Filter, Loader2, Pencil, PlayCircle, RefreshCw, RotateCcw, Search, X } from 'lucide-react';
 import { entityService, executionService, getApiErrorMessage, reportService } from '../services/executionService';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -39,50 +39,37 @@ const ExecutionList = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [states, setStates] = useState([]);
-  const [districts, setDistricts] = useState([]);
   const [statesLoading, setStatesLoading] = useState(false);
-  const [districtsLoading, setDistrictsLoading] = useState(false);
   const [stateError, setStateError] = useState('');
-  const [districtError, setDistrictError] = useState('');
 
   const [filters, setFilters] = useState({
     status: 'all',
-    state: 'all',
-    district: 'all',
+    states: [],
   });
+
+  const [stateDropdownOpen, setStateDropdownOpen] = useState(false);
+  const stateDropdownRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useState('');
 
   const analysisStateOptions = useMemo(() => {
-    return toSortedUniqueOptions(analyses.map((analysis) => analysis.state));
+    return toSortedUniqueOptions(analyses.flatMap((analysis) => analysis.states || []));
   }, [analyses]);
-
-  const analysisDistrictOptions = useMemo(() => {
-    const scopedAnalyses =
-      filters.state === 'all'
-        ? analyses
-        : analyses.filter((analysis) => analysis.state === filters.state);
-
-    return toSortedUniqueOptions(scopedAnalyses.map((analysis) => analysis.district));
-  }, [analyses, filters.state]);
-
-  const stateNameToIdMap = useMemo(() => {
-    return new Map(
-      states
-        .map((stateItem) => [stateItem?.name, stateItem?.id])
-        .filter(([name, id]) => typeof name === 'string' && name.trim() && id)
-    );
-  }, [states]);
 
   const stateOptions = useMemo(() => {
     const entityStateOptions = toSortedUniqueOptions(states.map((stateItem) => stateItem?.name));
     return entityStateOptions.length > 0 ? entityStateOptions : analysisStateOptions;
   }, [states, analysisStateOptions]);
 
-  const districtOptions = useMemo(() => {
-    const entityDistrictOptions = toSortedUniqueOptions(districts.map((districtItem) => districtItem?.name));
-    return entityDistrictOptions.length > 0 ? entityDistrictOptions : analysisDistrictOptions;
-  }, [districts, analysisDistrictOptions]);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(event.target)) {
+        setStateDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadAnalyses = async () => {
     setLoading(true);
@@ -96,11 +83,8 @@ const ExecutionList = () => {
     if (filters.status !== 'all') {
       queryParams.status_group = filters.status;
     }
-    if (filters.state !== 'all') {
-      queryParams.state_filter = filters.state;
-    }
-    if (filters.district !== 'all') {
-      queryParams.district_filter = filters.district;
+    if (filters.states.length > 0) {
+      queryParams.states = filters.states.join(',');
     }
 
     const normalizedSearchQuery = searchQuery.trim();
@@ -143,53 +127,13 @@ const ExecutionList = () => {
     }
   };
 
-  const loadDistricts = async (stateId) => {
-    if (!stateId) {
-      setDistricts([]);
-      return;
-    }
-
-    setDistrictsLoading(true);
-    setDistrictError('');
-
-    try {
-      const districtItems = await entityService.getDistricts(stateId);
-      setDistricts(districtItems);
-    } catch (requestError) {
-      setDistricts([]);
-      setDistrictError(
-        `${getApiErrorMessage(requestError, 'Unable to load districts for selected state.')} Showing available analysis districts when possible.`
-      );
-    } finally {
-      setDistrictsLoading(false);
-    }
-  };
-
   useEffect(() => {
     void loadStates();
   }, []);
 
   useEffect(() => {
     void loadAnalyses();
-  }, [currentPage, filters.status, filters.state, filters.district, searchQuery]);
-
-  useEffect(() => {
-    if (filters.state === 'all') {
-      setDistricts([]);
-      setDistrictError('');
-      return;
-    }
-
-    const selectedStateId = stateNameToIdMap.get(filters.state);
-
-    if (!selectedStateId) {
-      setDistricts([]);
-      setDistrictError('');
-      return;
-    }
-
-    void loadDistricts(selectedStateId);
-  }, [filters.state, stateNameToIdMap]);
+  }, [currentPage, filters.status, filters.states, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
   const pageStartItem = totalItems === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -203,30 +147,22 @@ const ExecutionList = () => {
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
+    setFilters((currentFilters) => ({ ...currentFilters, [name]: value }));
+    setCurrentPage(1);
+  };
 
+  const handleStateToggle = (stateName) => {
     setFilters((currentFilters) => {
-      if (name === 'state') {
-        return {
-          ...currentFilters,
-          state: value,
-          district: 'all',
-        };
-      }
-
-      return {
-        ...currentFilters,
-        [name]: value,
-      };
+      const next = currentFilters.states.includes(stateName)
+        ? currentFilters.states.filter((s) => s !== stateName)
+        : [...currentFilters.states, stateName];
+      return { ...currentFilters, states: next };
     });
     setCurrentPage(1);
   };
 
   const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      state: 'all',
-      district: 'all',
-    });
+    setFilters({ status: 'all', states: [] });
     setSearchQuery('');
     setCurrentPage(1);
   };
@@ -267,7 +203,7 @@ const ExecutionList = () => {
     }
   };
 
-  const districtFilterDisabled = filters.state === 'all' || districtsLoading;
+
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -343,48 +279,66 @@ const ExecutionList = () => {
                 </select>
               </label>
 
-            <label className="space-y-1 text-sm text-slate-700">
-              <span className="font-medium text-slate-900">State</span>
-              <select
-                name="state"
-                value={filters.state}
-                onChange={handleFilterChange}
-                className="h-10 w-full rounded-md border-2 border-slate-300 bg-white px-3 text-sm text-slate-800 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="all">{statesLoading ? 'Loading states...' : 'All States'}</option>
-                {stateOptions.map((stateOption) => (
-                  <option key={stateOption} value={stateOption}>
-                    {stateOption}
-                  </option>
-                ))}
-              </select>
+            <div className="space-y-1 text-sm text-slate-700" ref={stateDropdownRef}>
+              <span className="font-medium text-slate-900 block">State</span>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setStateDropdownOpen((prev) => !prev)}
+                  className="h-10 w-full rounded-md border-2 border-slate-300 bg-white px-3 text-sm text-slate-800 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none flex items-center justify-between"
+                >
+                  <span className="truncate text-left">
+                    {statesLoading
+                      ? 'Loading states...'
+                      : filters.states.length === 0
+                        ? 'All States'
+                        : `${filters.states.length} state${filters.states.length > 1 ? 's' : ''} selected`}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-slate-500 shrink-0 ml-2" />
+                </button>
+                {stateDropdownOpen && stateOptions.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg">
+                    <div className="max-h-48 overflow-y-auto py-1">
+                      {stateOptions.map((stateOption) => (
+                        <label
+                          key={stateOption}
+                          className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={filters.states.includes(stateOption)}
+                            onChange={() => handleStateToggle(stateOption)}
+                            className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                          />
+                          <span>{stateOption}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {filters.states.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {filters.states.map((stateName) => (
+                    <span
+                      key={stateName}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800"
+                    >
+                      {stateName}
+                      <button
+                        type="button"
+                        aria-label={`Remove ${stateName}`}
+                        onClick={() => handleStateToggle(stateName)}
+                        className="hover:text-blue-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
               {stateError && <p className="text-xs text-amber-700">{stateError}</p>}
-            </label>
-
-            <label className="space-y-1 text-sm text-slate-700">
-              <span className="font-medium text-slate-900">District</span>
-              <select
-                name="district"
-                value={filters.district}
-                onChange={handleFilterChange}
-                disabled={districtFilterDisabled}
-                className="h-10 w-full rounded-md border-2 border-slate-300 bg-white px-3 text-sm text-slate-800 transition-colors hover:border-blue-400 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                <option value="all">
-                  {filters.state === 'all'
-                    ? 'Select state first'
-                    : districtsLoading
-                      ? 'Loading districts...'
-                      : 'All Districts'}
-                </option>
-                {districtOptions.map((districtOption) => (
-                  <option key={districtOption} value={districtOption}>
-                    {districtOption}
-                  </option>
-                ))}
-              </select>
-              {districtError && <p className="text-xs text-amber-700">{districtError}</p>}
-            </label>
+            </div>
 
             <div className="flex items-end">
               <Button
@@ -446,8 +400,7 @@ const ExecutionList = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                       <th className="px-4 py-3 font-semibold">Name</th>
-                      <th className="px-4 py-3 font-semibold">State</th>
-                      <th className="px-4 py-3 font-semibold">District</th>
+                      <th className="px-4 py-3 font-semibold">State(s)</th>
                       <th className="px-4 py-3 font-semibold">Status</th>
                       <th className="px-4 py-3 font-semibold">Created Date</th>
                       <th className="px-4 py-3 text-right font-semibold">Actions</th>
@@ -465,10 +418,7 @@ const ExecutionList = () => {
                         >
                           <td className="px-4 py-3 text-sm font-medium text-slate-800">{analysis.name}</td>
                           <td className="px-4 py-3 text-sm text-slate-600">
-                            {analysis.state || '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600">
-                            {analysis.district || '-'}
+                            {analysis.states?.join(', ') || '-'}
                           </td>
                           <td className="px-4 py-3">
                             <span
@@ -566,17 +516,11 @@ const ExecutionList = () => {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-medium text-slate-800 text-sm truncate">{analysis.name}</h3>
                           <div className="mt-1 space-y-0.5">
-                            {analysis.state && (
+                            {analysis.states?.length > 0 ? (
                               <p className="text-xs text-slate-600">
-                                <span className="font-medium">State:</span> {analysis.state}
+                                <span className="font-medium">State:</span> {analysis.states.join(', ')}
                               </p>
-                            )}
-                            {analysis.district && (
-                              <p className="text-xs text-slate-600">
-                                <span className="font-medium">District:</span> {analysis.district}
-                              </p>
-                            )}
-                            {!analysis.state && !analysis.district && (
+                            ) : (
                               <p className="text-xs text-slate-500">-</p>
                             )}
                           </div>
