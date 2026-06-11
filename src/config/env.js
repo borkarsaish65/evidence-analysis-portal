@@ -23,6 +23,7 @@ const parseNumber = (value, key) => {
 };
 
 export const ENV = {
+  API_ENDPOINT: getRequiredEnv('API_ENDPOINT'),
   API_BASE_URL: getRequiredEnv('APPLICATION_BASE_URL'),
   AUTH_REFRESH_BUFFER_MS: parseNumber(
     getRequiredEnv('APPLICATION_AUTH_REFRESH_BUFFER_MS'),

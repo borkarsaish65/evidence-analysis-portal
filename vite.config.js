@@ -32,8 +32,6 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   const applicationPort = parseNumber(getRequiredEnv(env, 'APPLICATION_PORT'), 'APPLICATION_PORT');
-  const applicationBaseUrl = getRequiredEnv(env, 'APPLICATION_BASE_URL');
-  const apiEndpoint = getRequiredEnv(env, 'API_ENDPOINT');
   const buildOutDir = getRequiredEnv(env, 'APPLICATION_BUILD_OUT_DIR');
   const buildSourcemap = parseBoolean(
     getRequiredEnv(env, 'APPLICATION_BUILD_SOURCEMAP'),
@@ -45,18 +43,6 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['APPLICATION_', 'API_'],
     server: {
       port: applicationPort,
-      proxy: {
-        [applicationBaseUrl]: {
-          target: apiEndpoint,
-          changeOrigin: true,
-          configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq, req) => {
-              const targetOrigin = new URL(apiEndpoint).origin;
-              console.log(`[proxy] ${req.method} ${req.url} -> ${targetOrigin}${proxyReq.path}`);
-            });
-          },
-        }
-      }
     },
     build: {
       outDir: buildOutDir,

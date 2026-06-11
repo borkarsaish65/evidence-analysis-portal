@@ -12,7 +12,7 @@ export const registerAuthHandlers = ({ onRefresh, onLogout }) => {
 };
 
 const apiClient = axios.create({
-  baseURL: ENV.API_BASE_URL,
+  baseURL: `${ENV.API_ENDPOINT}${ENV.API_BASE_URL}`,
   headers: {
     'Content-Type': 'application/json',
   },

@@ -1,6 +1,6 @@
 ---
 # Evidence Analysis Portal - Frontend Deployment Playbook
-# Vite React app — builds dist/, served via Express (server.js) under PM2
+# Vite React app — builds static dist/ served by nginx
 
 - hosts: elevate
   vars:
@@ -55,21 +55,9 @@
       shell: rm -rf {{ current_path }} && mkdir -p {{ current_path }}
 
     - name: Move build output to serving folder
-      shell: mv "{{ release_path }}"/.env {{ current_path }}/.env && mv "{{ release_path }}"/* {{ current_path }}/
+      shell: mv {{ release_path }}/dist {{ current_path }}/dist
 
     - name: Delete release folder
       file:
         path: "{{ release_path }}"
         state: absent
-
-    - name: Delete old pm2 frontend process
-      command: pm2 delete evidence-frontend
-      ignore_errors: yes
-
-    - name: Start frontend with pm2
-      command: "pm2 start {{ current_path }}/server.js --name evidence-frontend"
-      register: frontendPm2Info
-
-    - name: debug frontend info
-      debug:
-        msg: "Frontend Pm2 log {{ frontendPm2Info }}"
