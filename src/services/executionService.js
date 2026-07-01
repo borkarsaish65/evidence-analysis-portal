@@ -449,6 +449,16 @@ export const executionService = {
   deleteExecution: async (executionId) => {
     await apiClient.delete(`/executions/${executionId}`);
   },
+
+  // Upload optional school filter CSV
+  uploadSchoolFilterFile: async (executionId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post(`/executions/${executionId}/files/school_filter/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };
 
 export const entityService = {

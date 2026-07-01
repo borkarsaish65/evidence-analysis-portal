@@ -15,6 +15,13 @@ const formatPercent = (value) => {
   return `${Math.max(0, Math.min(100, value)).toFixed(1)}%`;
 };
 
+const formatFileSize = (bytes) => {
+  if (typeof bytes !== 'number' || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const formatValue = (value) => {
   if (value === null || value === undefined) {
     return '-';
@@ -556,6 +563,22 @@ const ExecutionDetail = () => {
         <CardContent className="space-y-6">
           {renderPreviewSection('Input Data CSV', 'input')}
           {renderPreviewSection('Criteria / Questions CSV', 'questions')}
+          {execution.school_filter_file_url ? (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-slate-800">School Filter CSV</h4>
+              <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <FileText className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">
+                    {execution.school_filter_file_url.split('/').pop() || execution.school_filter_file_url}
+                  </p>
+                  {typeof execution.school_filter_file_size === 'number' && (
+                    <p className="text-xs text-slate-500">{formatFileSize(execution.school_filter_file_size)}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>
